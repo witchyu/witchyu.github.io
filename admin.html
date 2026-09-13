@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>หลังบ้านหมอดู - ร้าน Witch yu</title>
+    <link rel="apple-touch-icon" href="iconadmin.png">
+    <link rel="icon" type="image/png" href="iconadmin.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="admin">
+    <meta name="theme-color" content="#1a0b2e">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="theme-loader.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+        /* พื้นหลังเต็มจอทุกอัตราส่วน (position:fixed แยกเลเยอร์จากความสูงเนื้อหา)
+           ค่าเริ่มต้น = ธีมเดิม (ไล่สีม่วง-ทอง) เมื่อเลือกธีมเทศกาลจากหน้า admin
+           --theme-bg-layer จะถูกตั้งเป็นไฟล์ภาพประกอบของธีมนั้นแยกต่างหาก (bg-halloween.svg ฯลฯ) */
+        .theme-bg { background-color: var(--theme-bg-color, #0a0414); position: relative; }
+        .theme-bg::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-color: var(--theme-bg-color, #0a0414);
+            background-image: var(--theme-bg-layer,
+                linear-gradient(rgba(8, 4, 20, 0.55), rgba(8, 4, 20, 0.55)), url('bg-mystic.svg'));
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: cover;
+        }
+        .gold-text { color: #fde047; }
+        .gold-gradient-text {
+            background: var(--theme-gold-gradient, linear-gradient(to right, #fef08a, #fde047, #ca8a04));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gold-button {
+            background: var(--theme-button-gradient, linear-gradient(to right, #ca8a04, #eab308, #ca8a04));
+            color: var(--theme-button-text, #1a0b2e);
+            font-weight: 700;
+        }
+        .mystic-card {
+            background: rgba(26, 11, 46, 0.85);
+            border: 1px solid rgba(234, 179, 8, 0.3);
+            border-radius: 2rem;
+        }
+
+        /* ===== ตกแต่งธีมเวทมนตร์ อ้างอิงจากภาพพระจันทร์-ดวงดาวสีทองบนพื้นม่วง ===== */
+        .mystic-divider {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            color: rgba(234, 179, 8, 0.6);
+            font-size: 0.9rem;
+            letter-spacing: 0.3em;
+            margin: 0.25rem 0;
+        }
+        .mystic-divider::before, .mystic-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(234, 179, 8, 0.5), transparent);
+        }
+        .mystic-moonphases {
+            text-align: center;
+            font-size: 0.8rem;
+            letter-spacing: 0.5em;
+            color: rgba(253, 224, 71, 0.55);
+        }
+        .mystic-card::before {
+            content: '✦';
+            position: absolute;
+            top: 10px; left: 14px;
+            color: rgba(234, 179, 8, 0.5);
+            font-size: 0.8rem;
+        }
+        .mystic-card::after {
+            content: '✦';
+            position: absolute;
+            bottom: 10px; right: 14px;
+            color: rgba(234, 179, 8, 0.5);
+            font-size: 0.8rem;
+        }
+            /* ============ Theme color overrides ============
+           ให้กล่อง/นาว/เส้นขอบ/ตัวหนังสือเน้นสี ทุกจุดในหน้าเปลี่ยนสีตามธีมเทศกาลด้วย
+           ไม่ใช่แค่พื้นหลังกับปุ่มทอง ใช้ color-mix() ผสมความโปร่งใสจากสีธีมเดียวกัน จึงตัดกับ
+           พื้นหลังของแต่ละธีมชัดเจน ไม่ใช่สีม่วงเดิม (#120521/#1a0b2e) ค้างอยู่เวลาเปลี่ยนธีม
+           ไม่ได้เลือกธีม (ธีมเดิม) ตัวแปรจะไม่ถูกตั้งค่า จึง fallback เป็นสีเดิมทุกจุดเป๊ะๆ */
+        .gold-text { color: var(--theme-accent-text, #fde047) !important; }
+        .text-yellow-200 { color: var(--theme-accent-text, #fef08a) !important; }
+        .text-yellow-300 { color: var(--theme-accent-text, #fde047) !important; }
+        .text-yellow-400 { color: var(--theme-accent-text-strong, #facc15) !important; }
+
+        .bg-\[\#120521\] { background-color: var(--theme-card-bg, #120521) !important; }
+        .bg-\[\#120521\]\/60 { background-color: color-mix(in srgb, var(--theme-card-bg, #120521) 60%, transparent) !important; }
+        .bg-\[\#120521\]\/70 { background-color: color-mix(in srgb, var(--theme-card-bg, #120521) 70%, transparent) !important; }
+        .bg-\[\#120521\]\/90 { background-color: color-mix(in srgb, var(--theme-card-bg, #120521) 90%, transparent) !important; }
+        .bg-\[\#0d0420\] { background-color: var(--theme-card-bg, #0d0420) !important; }
+
+        .bg-\[\#1a0b2e\] { background-color: var(--theme-input-bg, #1a0b2e) !important; }
+        .bg-\[\#1a0b2e\]\/80 { background-color: color-mix(in srgb, var(--theme-input-bg, #1a0b2e) 80%, transparent) !important; }
+
+        .bg-\[\#0d041a\] { background-color: var(--theme-deep-bg, #0d041a) !important; }
+        .bg-\[\#0d041a\]\/85 { background-color: color-mix(in srgb, var(--theme-deep-bg, #0d041a) 85%, transparent) !important; }
+
+        .border-yellow-600\/10 { border-color: color-mix(in srgb, var(--theme-border-base, #ca8a04) 10%, transparent) !important; }
+        .border-yellow-600\/20 { border-color: color-mix(in srgb, var(--theme-border-base, #ca8a04) 20%, transparent) !important; }
+        .border-yellow-600\/30 { border-color: color-mix(in srgb, var(--theme-border-base, #ca8a04) 30%, transparent) !important; }
+        .border-yellow-600\/40 { border-color: color-mix(in srgb, var(--theme-border-base, #ca8a04) 40%, transparent) !important; }
+        .border-yellow-500 { border-color: var(--theme-border-base, #eab308) !important; }
+
+        .bg-slate-800 { background-color: var(--theme-alt-bg, #1e293b) !important; }
+        .bg-slate-900\/80 { background-color: color-mix(in srgb, var(--theme-alt-bg-deep, #0f172a) 80%, transparent) !important; }
+        .bg-slate-950 { background-color: var(--theme-alt-bg-deep, #020617) !important; }
+    </style>
+</head>
+<body class="theme-bg text-slate-100 min-h-screen">
+
+    <!-- ด่านตรวจรหัสผ่านก่อนเข้าใช้งานหลังบ้าน -->
+    <div id="pin-gate" class="fixed inset-0 z-[100] theme-bg flex items-center justify-center p-4">
+        <div class="mystic-card w-full max-w-xs p-6 space-y-4 text-center shadow-2xl">
+            <div class="text-4xl">🔮</div>
+            <h1 class="text-lg font-bold gold-gradient-text">กรุณากรอกรหัสผ่าน</h1>
+            <p class="text-xs text-slate-400">สำหรับผู้ดูแลระบบเท่านั้น</p>
+            <input type="password" id="pin-input" inputmode="numeric" maxlength="4" placeholder="••••"
+                class="w-full text-center tracking-[0.5em] text-xl bg-[#1a0b2e] border border-yellow-600/40 rounded-xl px-4 py-3 text-white"
+                onkeydown="if(event.key==='Enter') checkPin()">
+            <p id="pin-error" class="hidden text-xs text-red-400">รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่</p>
+            <button onclick="checkPin()" class="w-full py-3 gold-button rounded-xl text-sm">เข้าสู่ระบบ</button>
+        </div>
+    </div>
+
+    <div id="admin-protected" class="hidden">
+    <nav class="bg-[#120521]/90 border-b border-yellow-600/30 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center relative">
+            <span class="text-xl font-bold gold-gradient-text">🌙ระบบหลังบ้าน</span>
+            <div class="flex items-center gap-2">
+                <button id="theme-nav-btn" onclick="toggleThemeMenu()" class="px-3 py-2 rounded-xl border border-yellow-600/40 text-sm gold-text hover:bg-yellow-600/10 transition flex items-center gap-1">
+                     <span class="hidden sm:inline">ธีม</span>
+                </button>
+                <a href="index.html" class="px-4 py-2 rounded-xl gold-button text-sm">หน้าหลัก</a>
+            </div>
+            <!-- แผงเลือกธีมพื้นหลังตามเทศกาล ลอยจากปุ่ม 🎨 ธีม กดง่าย ไม่ต้องเลื่อนหาในหน้า -->
+            <div id="theme-menu" class="hidden absolute right-4 top-full mt-2 w-72 bg-[#120521] border border-yellow-600/30 rounded-2xl shadow-2xl p-4 z-50">
+                <div id="theme-picker" class="grid grid-cols-2 gap-3"></div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-4 py-10 space-y-6">
+        <section class="bg-[#120521] p-6 rounded-2xl border border-yellow-600/30 space-y-6 shadow-xl">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 class="text-xl font-bold gold-text">จัดการคิว</h1>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <button id="shop-status-btn" onclick="toggleShopStatus()" class="px-5 py-2.5 rounded-xl font-bold text-sm shadow-md"></button>
+                    <button id="phone-status-btn" onclick="togglePhoneAllowed()" class="px-5 py-2.5 rounded-xl font-bold text-sm shadow-md"></button>
+                    <button onclick="clearBookings()" class="px-4 py-2.5 bg-red-950/40 text-red-400 border border-red-600/40 rounded-xl text-sm">ล้างคิวทั้งหมด</button>
+                </div>
+            </div>
+
+            <hr class="border-yellow-600/20">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-semibold gold-text mb-2">➕ เพิ่มรอบเวลาใหม่</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-slot-input" placeholder="เช่น 12:00 - 12:30 น." class="w-full bg-[#1a0b2e] border border-yellow-600/30 rounded-xl px-3 py-2 text-xs text-white">
+                        <button onclick="addTimeSlot()" class="px-4 py-2 gold-button rounded-xl text-xs">เพิ่ม</button>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold gold-text mb-2">จัดการช่วงเวลาเปิด/ปิด</label>
+                <div id="slots-config-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
+            </div>
+
+            <div class="pt-4 border-t border-yellow-600/20 space-y-2">
+                <label class="block text-sm font-semibold gold-text">ปิดรับจองรายวัน</label>
+                <div class="flex gap-2">
+                    <input type="date" id="block-date-input" class="bg-[#1a0b2e] border border-yellow-600/30 rounded-xl px-3 py-2 text-xs text-white">
+                    <button onclick="addDisabledDate()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition">เพิ่มวันหยุด</button>
+                </div>
+                <div id="disabled-dates-container" class="flex flex-wrap gap-2 pt-2"></div>
+            </div>
+        </section>
+
+        <section class="mystic-card overflow-hidden shadow-2xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-yellow-950/20 gold-text text-sm border-b border-yellow-600/30">
+                            <th class="p-4">วัน-เวลา</th>
+                            <th class="p-4">แพ็กเกจ</th>
+                            <th class="p-4">ราคา</th>
+                            <th class="p-4">ชื่อลูกค้า</th>
+                            <th class="p-4">อายุ</th>
+                            <th class="p-4">สถานะ</th>
+                                    <th class="p-4">หมายเหตุ</th>
+                            <th class="p-4 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="booking-list" class="divide-y divide-yellow-600/20 text-sm"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+    </div>
+
+    <script>
+        // ตั้งค่ารหัสผ่านสำหรับเข้าใช้งานหน้าหลังบ้าน (แนะนำให้เปลี่ยนเป็นรหัสของร้านเอง)
+        const ADMIN_PIN = '0000';
+
+        function checkPin() {
+            const input = document.getElementById('pin-input');
+            const errorText = document.getElementById('pin-error');
+            if (input.value.trim() === ADMIN_PIN) {
+                sessionStorage.setItem('witchyu_admin_authed', 'true');
+                document.getElementById('pin-gate').classList.add('hidden');
+                document.getElementById('admin-protected').classList.remove('hidden');
+            } else {
+                errorText.classList.remove('hidden');
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (sessionStorage.getItem('witchyu_admin_authed') === 'true') {
+                document.getElementById('pin-gate').classList.add('hidden');
+                document.getElementById('admin-protected').classList.remove('hidden');
+            } else {
+                document.getElementById('pin-input').focus();
+            }
+        });
+    </script>
+
+    <script>
+
+    const SUPABASE_URL = 'https://yttxybfektembafzxbdq.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0dHh5YmZla3RlbWJhZnp4YmRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MDAzOTEsImV4cCI6MjEwNDA3NjM5MX0.51nc6Rd02p5pwPvQyTRDDnC1I0wOaQa9uMp7JKkaVMk';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+
+        let settings = {};
+        let bookings = [];
+
+        // ป้องกัน XSS: escape ค่าที่มาจากลูกค้า (client_name, master, note ฯลฯ) ก่อนใส่ลง innerHTML
+        function escapeHtml(value) {
+            if (value === null || value === undefined || value === '') return '-';
+            return String(value).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchAdminData();
+            supabaseClient.channel('admin-changes')
+                .on('postgres_changes', { event: '*', schema: 'public' }, () => { fetchAdminData(); })
+                .subscribe();
+        });
+
+        async function fetchAdminData() {
+            const { data: settingsData } = await supabaseClient.from('settings').select('*').eq('id', 1).single();
+            const { data: bookingsData } = await supabaseClient.from('bookings').select('*').order('booking_date', { ascending: true }).order('booking_time', { ascending: true });
+            settings = settingsData || {};
+            bookings = bookingsData || [];
+            updateAdminUI();
+        }
+
+        function updateAdminUI() {
+            const shopBtn = document.getElementById('shop-status-btn');
+            if (settings.is_shop_open) {
+                shopBtn.className = "px-5 py-2.5 rounded-xl font-bold text-sm bg-emerald-600 text-white";
+                shopBtn.innerHTML = "เปิด";
+            } else {
+                shopBtn.className = "px-5 py-2.5 rounded-xl font-bold text-sm bg-red-600 text-white";
+                shopBtn.innerHTML = "ปิด";
+            }
+
+            // แก้ไข: เดิมข้อความสลับกับสถานะจริง (true แสดง "ปิด", false แสดง "เปิด")
+            // ตอนนี้ให้แสดงสถานะปัจจุบันให้ตรงกับปุ่มเปิด/ปิดร้านด้านบน
+            const phoneBtn = document.getElementById('phone-status-btn');
+            if (settings.is_phone_allowed) {
+                phoneBtn.className = "px-5 py-2.5 rounded-xl font-bold text-sm bg-emerald-600 text-white";
+                phoneBtn.innerHTML = "คำถามแบบโทร เปิด";
+            } else {
+                phoneBtn.className = "px-5 py-2.5 rounded-xl font-bold text-sm bg-red-600 text-white";
+                phoneBtn.innerHTML = "คำถามแบบโทร ปิด";
+            }
+
+            renderSlotsConfig();
+            renderDisabledDates();
+            renderThemePicker();
+            renderTable();
+        }
+
+        // ปุ่มเลือกธีมพื้นหลังตามเทศกาล: อ่านรายชื่อธีมจาก theme-loader.js (window.WITCHYU_THEMES)
+        // เพิ่ม/แก้ธีมแค่ที่เดียวในไฟล์นั้น ที่นี่แค่ไล่ render ปุ่มตามรายการ
+        function renderThemePicker() {
+            const container = document.getElementById('theme-picker');
+            if (!container) return;
+            const themes = window.WITCHYU_THEMES || {};
+            const current = settings.active_theme || 'default';
+
+            function swatchStyle(theme) {
+                if (!theme) return 'background:radial-gradient(circle at 50% 20%, #2e1046 0%, #1a0b2e 70%, #0d041a 100%);';
+                // โชว์ภาพประกอบจริงของธีมเป็นตัวอย่างย่อ แทนที่จะโชว์แค่สีไล่เฉด
+                return `background-image:${theme.bgImage ? `url('${theme.bgImage}')` : theme.radial}; background-size:cover; background-position:center;`;
+            }
+
+            const cards = [{ key: 'default', label: 'ธีมเดิม', theme: null }]
+                .concat(Object.keys(themes).map(key => ({ key, label: themes[key].label, theme: themes[key] })));
+
+            container.innerHTML = cards.map(c => `
+                <button onclick="selectTheme('${c.key}')"
+                    class="relative rounded-xl overflow-hidden border-2 ${c.key === current ? 'border-yellow-400 shadow-[0_0_12px_rgba(234,179,8,0.5)]' : 'border-yellow-600/20'} transition">
+                    <div class="h-16 w-full" style="${swatchStyle(c.theme)}"></div>
+                    <div class="text-xs py-1.5 ${c.key === current ? 'text-yellow-300 font-bold' : 'text-slate-300'} bg-[#0d0420]">${escapeHtml(c.label)}</div>
+                    ${c.key === current ? '<div class="absolute top-1 right-1 text-yellow-300 text-xs">✦</div>' : ''}
+                </button>
+            `).join('');
+        }
+
+        function toggleThemeMenu() {
+            document.getElementById('theme-menu').classList.toggle('hidden');
+        }
+        // ปิดแผงเลือกธีมเมื่อคลิกนอกกรอบ
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('theme-menu');
+            const btn = document.getElementById('theme-nav-btn');
+            if (!menu || menu.classList.contains('hidden')) return;
+            if (!menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        async function selectTheme(key) {
+            const value = key === 'default' ? null : key;
+            // อัปเดตหน้าตาแอดมินให้เห็นผลทันที ไม่ต้องรอ round-trip ไป Supabase
+            if (window.applyWitchyuTheme) window.applyWitchyuTheme(value);
+            document.getElementById('theme-menu').classList.add('hidden');
+            const { error } = await supabaseClient.from('settings').update({ active_theme: value }).eq('id', 1);
+            if (error) {
+                alert('บันทึกธีมไม่สำเร็จ: ' + error.message + '\n(เช็กว่าตาราง settings มีคอลัมน์ active_theme แล้วหรือยัง)');
+            }
+            fetchAdminData();
+        }
+
+        async function toggleShopStatus() {
+            await supabaseClient.from('settings').update({ is_shop_open: !settings.is_shop_open }).eq('id', 1);
+            fetchAdminData();
+        }
+
+        async function togglePhoneAllowed() {
+            await supabaseClient.from('settings').update({ is_phone_allowed: !settings.is_phone_allowed }).eq('id', 1);
+            fetchAdminData();
+        }
+
+        async function toggleSlot(index) {
+            let slots = settings.time_slots_config || [];
+            slots[index].isOpen = !slots[index].isOpen;
+            await supabaseClient.from('settings').update({ time_slots_config: slots }).eq('id', 1);
+            fetchAdminData();
+        }
+
+        async function deleteSlot(index) {
+            let slots = settings.time_slots_config || [];
+            slots.splice(index, 1);
+            await supabaseClient.from('settings').update({ time_slots_config: slots }).eq('id', 1);
+            fetchAdminData();
+        }
+
+        async function addTimeSlot() {
+            const input = document.getElementById('new-slot-input');
+            if (!input.value.trim()) return;
+            let slots = settings.time_slots_config || [];
+            slots.push({ time: input.value.trim(), isOpen: true });
+            input.value = '';
+            await supabaseClient.from('settings').update({ time_slots_config: slots }).eq('id', 1);
+            fetchAdminData();
+        }
+
+        async function addDisabledDate() {
+            const dateVal = document.getElementById('block-date-input').value;
+            if (!dateVal) {
+                alert('กรุณาเลือกวันที่ต้องการปิดรับจองก่อนครับ');
+                return;
+            }
+            let disabled = settings.disabled_dates || [];
+            if (!disabled.includes(dateVal)) {
+                disabled.push(dateVal);
+                await supabaseClient.from('settings').update({ disabled_dates: disabled }).eq('id', 1);
+                fetchAdminData();
+            } else {
+                alert('วันนี้ถูกบันทึกเป็นวันหยุดไปแล้วครับ');
+            }
+            document.getElementById('block-date-input').value = '';
+        }
+
+        async function removeDisabledDate(dateStr) {
+            let disabled = settings.disabled_dates || [];
+            disabled = disabled.filter(d => d !== dateStr);
+            await supabaseClient.from('settings').update({ disabled_dates: disabled }).eq('id', 1);
+            fetchAdminData();
+        }
+
+        function renderSlotsConfig() {
+            const container = document.getElementById('slots-config-container');
+            container.innerHTML = '';
+            (settings.time_slots_config || []).forEach((slot, index) => {
+                container.innerHTML += `
+                    <div class="flex items-center justify-between p-3 bg-[#1a0b2e] border border-yellow-600/30 rounded-xl text-xs">
+                        <span>${escapeHtml(slot.time)}</span>
+                        <div class="flex gap-2">
+                            <button onclick="toggleSlot(${index})" class="px-2 py-1 rounded ${slot.isOpen !== false ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}">${slot.isOpen !== false ? 'เปิด' : 'ปิด'}</button>
+                            <button onclick="deleteSlot(${index})" class="px-2 py-1 bg-red-950 text-red-400 rounded">ลบ</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderDisabledDates() {
+            const container = document.getElementById('disabled-dates-container');
+            container.innerHTML = '';
+            const disabled = settings.disabled_dates || [];
+            if (disabled.length === 0) {
+                container.innerHTML = '<span class="text-xs text-slate-400">ยังไม่มีวันหยุดที่ถูกบล็อก</span>';
+                return;
+            }
+            disabled.forEach(d => {
+                container.innerHTML += `
+                    <div class="flex items-center gap-2 bg-red-950 border border-red-600/40 px-3 py-1 rounded-xl text-xs text-red-200">
+                        <span>🚫 ${escapeHtml(d)}</span>
+                        <button onclick="removeDisabledDate('${d}')" class="font-bold text-white hover:text-red-400">×</button>
+                    </div>
+                `;
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('booking-list');
+            tbody.innerHTML = '';
+            if (bookings.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-500">ยังไม่มีคิวจองในระบบ</td></tr>`;
+                return;
+            }
+            bookings.forEach(b => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-yellow-950/10">
+                        <td class="p-4">${escapeHtml(b.booking_date)}<br><span class="text-xs text-yellow-300">${escapeHtml(b.booking_time)}</span></td>
+                        <td class="p-4">${escapeHtml(b.master)}</td>
+                        <td class="p-4 font-semibold text-yellow-400">${b.total_price != null ? Number(b.total_price).toLocaleString('th-TH') + ' บาท' : '-'}</td>
+                        <td class="p-4">${escapeHtml(b.client_name)}</td>
+                        <td class="p-4">${b.client_age != null ? b.client_age : '-'}</td>
+                        <td class="p-4">${escapeHtml(b.client_status)}</td>
+                        <td class="p-4 text-slate-400">${escapeHtml(b.note)}</td>
+                        <td class="p-4 text-center">
+                            <button onclick="deleteBooking(${b.id})" class="px-3 py-1 bg-red-950 text-red-400 border border-red-600/40 rounded-lg text-xs">ลบ</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function deleteBooking(id) {
+            if (confirm('คุณต้องการลบคิวนี้ใช่หรือไม่?')) {
+                await supabaseClient.from('bookings').delete().eq('id', id);
+                fetchAdminData();
+            }
+        }
+
+        async function clearBookings() {
+            if (confirm('คุณต้องการล้างข้อมูลคิวทั้งหมดใช่หรือไม่?')) {
+                await supabaseClient.from('bookings').delete().neq('id', 0);
+                fetchAdminData();
+            }
+        }
+    </script>
+</body>
+    </html>

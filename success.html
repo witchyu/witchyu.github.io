@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+    <title>ยืนยันการจองคิว - ร้าน Witch yu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="theme-loader.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+        /* พื้นหลังเต็มจอทุกอัตราส่วน (position:fixed แยกเลเยอร์จากความสูงเนื้อหา)
+           ค่าเริ่มต้น = ธีมเดิม (ไล่สีม่วง-ทอง) เมื่อเลือกธีมเทศกาลจากหน้า admin
+           --theme-bg-layer จะถูกตั้งเป็นไฟล์ภาพประกอบของธีมนั้นแยกต่างหาก (bg-halloween.svg ฯลฯ) */
+        .theme-bg { background-color: var(--theme-bg-color, #0a0414); position: relative; }
+        .theme-bg::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-color: var(--theme-bg-color, #0a0414);
+            background-image: var(--theme-bg-layer,
+                linear-gradient(rgba(8, 4, 20, 0.55), rgba(8, 4, 20, 0.55)), url('bg-mystic.svg'));
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: cover;
+        }
+        .gold-text { color: #fde047; }
+        .gold-gradient-text {
+            background: var(--theme-gold-gradient, linear-gradient(to right, #fef08a, #fde047, #ca8a04));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gold-button {
+            background: var(--theme-button-gradient, linear-gradient(to right, #ca8a04, #eab308, #ca8a04));
+            color: var(--theme-button-text, #1a0b2e);
+            font-weight: 700;
+        }
+        .mystic-card {
+            background: rgba(26, 11, 46, 0.85);
+            border: 1px solid rgba(234, 179, 8, 0.3);
+            border-radius: 2rem;
+        }
+
+        /* ===== ตกแต่งธีมเวทมนตร์ อ้างอิงจากภาพพระจันทร์-ดวงดาวสีทองบนพื้นม่วง ===== */
+        .mystic-divider {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            color: rgba(234, 179, 8, 0.6);
+            font-size: 0.9rem;
+            letter-spacing: 0.3em;
+            margin: 0.25rem 0;
+        }
+        .mystic-divider::before, .mystic-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(234, 179, 8, 0.5), transparent);
+        }
+        .mystic-moonphases {
+            text-align: center;
+            font-size: 0.8rem;
+            letter-spacing: 0.5em;
+            color: rgba(253, 224, 71, 0.55);
+        }
+        .mystic-card::before {
+            content: '✦';
+            position: absolute;
+            top: 10px; left: 14px;
+            color: rgba(234, 179, 8, 0.5);
+            font-size: 0.8rem;
+        }
+        .mystic-card::after {
+            content: '✦';
+            position: absolute;
+            bottom: 10px; right: 14px;
+            color: rgba(234, 179, 8, 0.5);
+            font-size: 0.8rem;
+        }
+            /* ============ Theme color overrides ============
+           ให้กล่อง/นาว/เส้นขอบ/ตัวหนังสือเน้นสี ทุกจุดในหน้าเปลี่ยนสีตามธีมเทศกาลด้วย
+           ไม่ใช่แค่พื้นหลังกับปุ่มทอง ใช้ color-mix() ผสมความโปร่งใสจากสีธีมเดียวกัน จึงตัดกับ
+           พื้นหลังของแต่ละธีมชัดเจน ไม่ใช่สีม่วงเดิม (#120521/#1a0b2e) ค้างอยู่เวลาเปลี่ยนธีม
+           ไม่ได้เลือกธีม (ธีมเดิม) ตัวแปรจะไม่ถูกตั้งค่า จึง fallback เป็นสีเดิมทุกจุดเป๊ะๆ */
+        .gold-text { color: var(--theme-accent-text, #fde047) !important; }
+        .text-yellow-200 { color: var(--theme-accent-text, #fef08a) !important; }
+        .text-yellow-300 { color: var(--theme-accent-text, #fde047) !important; }
+        .text-yellow-400 { color: var(--theme-accent-text-strong, #facc15) !important; }
+
+        .bg-\[\#120521\] { background-color: var(--theme-card-bg, #120521) !important; }
+        .bg-\[\#120521\]\/60 { background-color: color-mix(in srgb, var(--theme-card-bg, #120521) 60%, transparent) !important; }
+        .bg-\[\#120521\]\/70 { background-color: color-mix(in srgb, var(--theme-card-bg, #120521) 70%, transparent) !important; }
+        .bg-\[\#120521\]\/90 { background-color: color-mix(in srgb, var(--theme-card-bg, #120521) 90%, transparent) !important; }
+        .bg-\[\#0d0420\] { background-color: var(--theme-card-bg, #0d0420) !important; }
+
+        .bg-\[\#1a0b2e\] { background-color: var(--theme-input-bg, #1a0b2e) !important; }
+        .bg-\[\#1a0b2e\]\/80 { background-color: color-mix(in srgb, var(--theme-input-bg, #1a0b2e) 80%, transparent) !important; }
+
+        .bg-\[\#0d041a\] { background-color: var(--theme-deep-bg, #0d041a) !important; }
+        .bg-\[\#0d041a\]\/85 { background-color: color-mix(in srgb, var(--theme-deep-bg, #0d041a) 85%, transparent) !important; }
+
+        .border-yellow-600\/10 { border-color: color-mix(in srgb, var(--theme-border-base, #ca8a04) 10%, transparent) !important; }
+        .border-yellow-600\/20 { border-color: color-mix(in srgb, var(--theme-border-base, #ca8a04) 20%, transparent) !important; }
+        .border-yellow-600\/30 { border-color: color-mix(in srgb, var(--theme-border-base, #ca8a04) 30%, transparent) !important; }
+        .border-yellow-600\/40 { border-color: color-mix(in srgb, var(--theme-border-base, #ca8a04) 40%, transparent) !important; }
+        .border-yellow-500 { border-color: var(--theme-border-base, #eab308) !important; }
+
+        .bg-slate-800 { background-color: var(--theme-alt-bg, #1e293b) !important; }
+        .bg-slate-900\/80 { background-color: color-mix(in srgb, var(--theme-alt-bg-deep, #0f172a) 80%, transparent) !important; }
+        .bg-slate-950 { background-color: var(--theme-alt-bg-deep, #020617) !important; }
+    </style>
+</head>
+<body class="theme-bg text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-md w-full mystic-card p-6 md:p-8 shadow-2xl space-y-6 text-center relative">
+        <h1 class="text-2xl font-bold gold-gradient-text">จองคิวสำเร็จเรียบร้อย!</h1>
+        <div class="mystic-divider">☉</div>
+        <p class="text-xs text-slate-300">กรุณาตรวจสอบข้อมูลและสแกน QR Code ด้านล่างเพื่อชำระเงินค่าบริการ</p>
+        
+        <div id="summary-details" class="bg-[#120521] border border-yellow-600/30 p-4 rounded-xl text-left text-xs space-y-2 text-slate-200">
+            </div>
+
+        <div class="space-y-3">
+              <p class="text-xs text-slate-300">รบกวนลูกค้าส่งหลักฐานการชำระเงินมาทางช่องทางติดต่อของทางร้าน เพื่อยืนยันสิทธิการจองคิว และให้ทางร้านติดต่อกลับเพื่อแจ้งรายละเอียดเพิ่มเติมค่ะ ขอบคุณที่ใช้บริการค่ะ</p>
+              
+           <p class="text-xs text-yellow-400 font-semibold">QR Code สำหรับชำระเงิน</p>
+            <div class="flex justify-center">
+                <img src="qrcode.PNG" alt="Shop QR Code" class="w-60 h-60 object-contain border-2 border-yellow-500/50 rounded-xl bg-white p-2 shadow-lg">
+            </div>
+
+            <!-- ส่วนแสดงรูปโลโก้ TrueMoney Wallet (จัดกึ่งกลาง พร้อมชื่อและเบอร์ด้านขวา) -->
+            <div class="flex items-center justify-center space-x-3 pt-1">
+                <!-- เปลี่ยนชื่อไฟล์ truemoney.jpg หรือ truemoney.png ให้ตรงกับรูปที่คุณอัปโหลด -->
+                <img src="truemoney.png" alt="TrueMoney Logo" class="w-10 h-10 object-contain rounded-full bg-white p-1 shadow-md shrink-0">
+                <div class="text-left">
+                    <p class="text-[11px] text-yellow-400 font-medium">นางสาววรรณรดา ทรรศนีย์กุลกิจ</p>
+                    <div class="flex justify-center items-center w-full">
+  <p class="text-xs text-slate-200 font-semibold">0624509500</p>
+</div>
+
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <a href="index.html" class="inline-block w-full py-3 gold-button rounded-xl text-xs uppercase shadow-md">
+                กลับสู่หน้าหลัก / จองคิวเพิ่ม
+            </a>
+      <div class="flex flex-col items-center justify-center space-y-2 pt-2">
+            <a href="https://www.instagram.com/witchyu_2006?igsi=MTY1dzFwYTZxcHg2Ng==" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-500 via-pink-600 to-purple-600 text-white shadow-lg hover:scale-110 transition-transform">
+                <i class="fab fa-instagram text-lg"></i>
+            </a>
+              <span class="text-xs text-slate-300">ส่งข้อความ</span>
+        </div>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const master = params.get('master') || '-';
+            const date = params.get('date') || '-';
+            const time = params.get('time') || '-';
+            const name = params.get('name') || '-';
+            const age = params.get('age') || '-';
+            const status = params.get('status') || '-';
+            const note = params.get('note') || '-';
+            const total = params.get('total') || '0';
+
+            document.getElementById('summary-details').innerHTML = `
+                <p><strong>ชื่อคุณ:</strong> ${name} <span class="text-slate-400">(อายุ ${age} ปี, ${status})</span></p>
+                <p><strong>รายการ:</strong> ${master}</p>
+                <p><strong>วันที่:</strong> ${date} | <strong>เวลา:</strong> ${time}</p>
+                <p><strong>หมายเหตุ:</strong> ${note}</p>
+                <p class="pt-2 mt-2 border-t border-yellow-600/20 flex justify-between items-center">
+                    <strong>ราคารวม:</strong>
+                    <span class="text-yellow-400 font-bold text-base">${Number(total).toLocaleString('th-TH')} บาท</span>
+                </p>
+            `;
+        });
+    </script>
+</body>
+</html>
